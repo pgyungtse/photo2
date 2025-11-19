@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>即拍即傳</title>
+  <style>
+    body {margin:0;padding:20px;text-align:center;font-family:sans-serif;background:#f0f0f0;}
+    #preview {max-width:100%;border-radius:12px;margin:20px 0;}
+    input {padding:15px;font-size:18px;}
+  </style>
+</head>
+<body>
+  <h1>手機即拍即傳</h1>
+  <input type="file" accept="image/*" capture="environment" id="cam">
+  <br><br>
+  <img id="preview" src="" alt="預覽照片">
+
+<script>
+  document.getElementById('cam').onchange = async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    document.getElementById('preview').src = URL.createObjectURL(file);
+    
+    let f = new FormData();
+    f.append('photo', file);
+    
+    const res = await fetch('/upload', {method:'POST', body:f});
+    const json = await res.json();
+    
+    // 美觀顯示 JSON
+    document.body.insertAdjacentHTML('beforeend', 
+      `<pre style="background:#000;color:#0f0;padding:15px;margin:20px;border-radius:8px;overflow:auto;">
+${JSON.stringify(json, null, 2)}
+      </pre>`);
+    alert('OCR 完成！往下拉看結果');
+  };
+</script>
+</body>
+</html>
