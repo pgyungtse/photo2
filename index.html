@@ -18,22 +18,30 @@
     #preview { 
       width:100%; max-width:100%; border-radius:12px; 
       margin:20px 0; box-shadow:0 4px 12px rgba(0,0,0,0.2);
+      display: none;
     }
     #side { 
       margin-top:20px; padding:10px; 
       background:rgba(255,255,255,0.9); border-radius:12px;
       max-height:60vh; overflow-y:auto;
     }
-    details summary { font-size:18px; padding:10px 0; }
-    table { font-size:16px; }
+    details summary { font-size:18px; padding:10px 0; cursor: pointer; }
+    table { font-size:16px; width: 100%; border-collapse: collapse; }
+    table td { padding: 8px 4px; border-bottom: 1px solid #ddd; }
     pre { font-size:13px; }
+    .success-box { padding:20px; background:#042a00; color:#b7ffb7; border-radius:12px; }
+    .error-box { padding:20px; background:#3a0000; color:#ffb7b7; border-radius:12px; }
+    .loading-box { padding:20px; background:#111; color:#fff; border-radius:12px; text-align:center; }
+    .total-amount { font-size:28px; color:#ffd24d; font-weight: bold; }
   </style>
 </head>
 <body>
   <h1>手機即拍即傳</h1>
 
   <div style="text-align:center;">
-    <label for="cam" style="display:inline-block;width:100%;padding:22px;font-size:24px;font-weight:bold;background:#555;color:#ffffff;border-radius:12px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.2);text-align:center;"> 📷 拍照 </label>
+    <label for="cam" style="display:inline-block;width:100%;padding:22px;font-size:24px;font-weight:bold;background:#555;color:#ffffff;border-radius:12px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.2);text-align:center;"> 
+      📷 拍照 
+    </label>
     <input type="file" accept="image/*" capture="environment" id="cam" style="display:none;">
    
     <br>
@@ -43,54 +51,108 @@
   <div id="side"></div>
 
 <script>
-  function escapeHtml(str) {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-              .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-  }
-
   document.getElementById('cam').onchange = async e => {
     const file = e.target.files[0];
     if (!file) return;
-    document.getElementById('preview').src = URL.createObjectURL(file);
+    
+    const preview = document.getElementById('preview');
+    preview.src = URL.createObjectURL(file);
+    preview.style.display = 'block';
 
     const side = document.getElementById('side');
-    side.innerHTML = '<div style="padding:20px;background:#111;color:#fff;border-radius:12px;text-align:center;"><h3>⏳ 正在辨識發票…</h3></div>';
+    side.innerHTML = '<div class="loading-box"><h3>⏳ 正在辨識發票…</h3></div>';
 
-    const f = new FormData();
-    f.append('photo', file);
+    const formData = new FormData();
+    formData.append('photo', file);
 
     try {
-      const res = await fetch('/upload', { method: 'POST', body: f });
+      const res = await fetch('/upload', { 
+        method: 'POST', 
+        body: formData 
+      });
+      
       const result = await res.json();
       side.innerHTML = '';
 
-      if (result.code === 200) {
-        const p = result.products?.products || [];
+      if (res.ok) {
+        // 成功響應 (200-299)
+        const products = result.products || [];
         side.innerHTML = `
-          <div style="padding:20px;background:#042a00;color:#b7ffb7;border-radius:12px;">
+          <div class="success-box">
             <h3>✅ OCR 成功</h3>
             <p><strong>商店：</strong>${result.retail_outlet_name || '－'}</p>
             <p><strong>地址：</strong>${result.retail_outlet_address || '－'}</p>
             <p><strong>日期：</strong>${result.purchase_date || '－'}</p>
-            <p style="font-size:28px;"><strong>總額：</strong> <span style="color:#ffd24d;">$${result.total_transaction_amount}</span></p>
-            <p><strong>項目：</strong>${p.length} 項</p>
-            <details><summary style="cursor:pointer;">展開品項</summary>
-              <table width="100%">
-                ${p.length ? p.map(i=>`<tr><td>${i.product_name}</td><td align="right">${i.quantity} × $${i.unit_price}</td></tr>`).join('') 
-                  : '<tr><td>無品項資料</td></tr>'}
-              </table>
+            <p><strong>電話：</strong>${result.phone_number || '－'}</p>
+            <p><strong>發票號碼：</strong>${result.invoice_number || '－'}</p>
+            <p><strong>條碼：</strong>${result.barcode || '－'}</p>
+            <p style="font-size:28px;"><strong>總額：</strong> <span class="total-amount">$${result.total_transaction_amount || 0}</span></p>
+            <p><strong>項目：</strong>${products.length} 項</p>
+            
+            ${products.length > 0 ? `
+              <details>
+                <summary>展開品項</summary>
+                <table>
+                  <tr>
+                    <th align="left">品名</th>
+                    <th align="right">數量</th>
+                    <th align="right">價錢</th>
+                  </tr>
+                  ${products.map(item => `
+                    <tr>
+                      <td>${escapeHtml(item.product_name || '')}</td>
+                      <td align="right">${item.quantity || 0}</td>
+                      <td align="right">$${item.unit_price || 0}</td>
+                    </tr>
+                  `).join('')}
+                </table>
+              </details>
+            ` : '<p>無品項資料</p>'}
+            
+            <details>
+              <summary>原始數據</summary>
+              <pre style="background:#000;padding:10px;border-radius:8px;overflow:auto;color:#b7ffb7;">${JSON.stringify(result, null, 2)}</pre>
             </details>
           </div>`;
       } else {
-        side.innerHTML = `<div style="padding:20px;background:#3a0000;color:#ffb7b7;border-radius:12px;">
-          <h3>✖ ${result.code || res.status} 錯誤</h3>
-          <pre style="background:#000;padding:10px;border-radius:8px;overflow:auto;">${JSON.stringify(result, null, 2)}</pre>
-        </div>`;
+        // 錯誤響應
+        side.innerHTML = `
+          <div class="error-box">
+            <h3>❌ 辨識失敗</h3>
+            <p><strong>錯誤代碼：</strong> ${result.code || res.status}</p>
+            <p><strong>錯誤信息：</strong> ${result.error || '未知錯誤'}</p>
+            ${result.details ? `
+              <details>
+                <summary>詳細錯誤信息</summary>
+                <pre style="background:#000;padding:10px;border-radius:8px;overflow:auto;">${JSON.stringify(result.details, null, 2)}</pre>
+              </details>
+            ` : ''}
+          </div>`;
       }
     } catch (err) {
-      side.innerHTML = '<div style="padding:20px;background:#3a0000;color:#ffb7b7;border-radius:12px;"><h3>✖ 網絡錯誤</h3></div>';
+      side.innerHTML = `
+        <div class="error-box">
+          <h3>✖ 網絡錯誤</h3>
+          <p>${err.message}</p>
+          <p>請檢查：</p>
+          <ul>
+            <li>伺服器是否正在運行 (port 3003)</li>
+            <li>網絡連接是否正常</li>
+            <li>API_KEY 是否正確設置</li>
+          </ul>
+        </div>`;
     }
   };
+
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
 </script>
 </body>
 </html>

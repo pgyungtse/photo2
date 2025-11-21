@@ -39,3 +39,13 @@ npm start
 - If `npm start` fails, check `app.js` and `package.json` scripts for required configuration.
 
 If you want, I can add a simple Express server or instructions to automatically list the images — tell me which you'd prefer.
+
+## re-build in ubuntu local server (docker)
+
+sudo docker stop takephoto
+
+sudo docker rm takephoto
+
+sudo docker build -t takephoto-app .
+
+sudo docker run -d -p 3003:3003 --name takephoto --restart always -v /home/takephoto/photos:/app/photos takephoto-app
