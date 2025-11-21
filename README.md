@@ -49,3 +49,12 @@ sudo docker rm takephoto
 sudo docker build -t takephoto-app .
 
 sudo docker run -d -p 3003:3003 --name takephoto --restart always -v /home/takephoto/photos:/app/photos takephoto-app
+
+## Dockerfile
+FROM node:24-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+EXPOSE 3003
+CMD ["npm", "start"]
